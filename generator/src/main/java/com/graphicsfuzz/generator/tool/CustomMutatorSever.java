@@ -16,27 +16,25 @@
 
 package com.graphicsfuzz.generator.tool;
 
-import com.graphicsfuzz.generator.fuzzer.FuzzedIntoACornerException;
-import com.graphicsfuzz.common.util.ParseTimeoutException;
-import com.graphicsfuzz.common.util.ShaderKind;
-import com.graphicsfuzz.common.util.RandomWrapper;
+import com.graphicsfuzz.common.ast.TranslationUnit;
+import com.graphicsfuzz.common.tool.PrettyPrinterVisitor;
 import com.graphicsfuzz.common.util.GlslParserException;
 import com.graphicsfuzz.common.util.ParseHelper;
-import com.graphicsfuzz.common.tool.PrettyPrinterVisitor;
-import com.graphicsfuzz.common.ast.TranslationUnit;
-
-import java.io.PrintStream;
+import com.graphicsfuzz.common.util.ParseTimeoutException;
+import com.graphicsfuzz.common.util.RandomWrapper;
+import com.graphicsfuzz.common.util.ShaderKind;
+import com.graphicsfuzz.generator.fuzzer.FuzzedIntoACornerException;
 import java.io.ByteArrayOutputStream;
-import java.net.ServerSocket;
-import java.net.Socket;
+import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.io.PrintStream;
+import java.net.ServerSocket;
+import java.net.Socket;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
-import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.Optional;
-
 
 public class CustomMutatorSever {
   public static void main(String[] args) {
@@ -48,8 +46,8 @@ public class CustomMutatorSever {
     }
   }
 
-  private static void runServer(int port) throws IOException, ParseTimeoutException,
-      InterruptedException{
+  private static void runServer(int port)
+      throws IOException, ParseTimeoutException, InterruptedException {
     ByteArrayOutputStream byteArrayOutputStream;
     TranslationUnit tu;
     byte[] headerBuff = new byte[28];
@@ -59,8 +57,7 @@ public class CustomMutatorSever {
     OutputStream outputStream = socket.getOutputStream();
     while (true) {
       // TODO(metzman) Figure out a better way to handle waiting for the header to arrive.
-      while (inputStream.available() < headerBuff.length)
-        ;
+      while (inputStream.available() < headerBuff.length) ;
       inputStream.read(headerBuff, 0, headerBuff.length);
       ByteBuffer bb = ByteBuffer.wrap(headerBuff);
       bb.order(ByteOrder.LITTLE_ENDIAN);
@@ -83,8 +80,7 @@ public class CustomMutatorSever {
               stream,
               PrettyPrinterVisitor.DEFAULT_INDENTATION_WIDTH,
               PrettyPrinterVisitor.DEFAULT_NEWLINE_SUPPLIER,
-              false
-          );
+              false);
           String data = new String(byteArrayOutputStream.toByteArray(), StandardCharsets.UTF_8);
           ByteBuffer lengthByteBuffer = ByteBuffer.allocate(8);
           lengthByteBuffer.order(ByteOrder.LITTLE_ENDIAN);
