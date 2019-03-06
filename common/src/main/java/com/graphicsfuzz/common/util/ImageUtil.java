@@ -78,9 +78,9 @@ public class ImageUtil {
     opencv_core.split(matWithAlpha, bgraChannels);
     opencv_core.MatVector hsvChannels = new opencv_core.MatVector();
     opencv_core.split(mat, hsvChannels);
-
+/*
     hsvChannels.push_back(bgraChannels.get(3));
-
+*/
     opencv_core.merge(hsvChannels, mat);
 
     // mat now contains:
