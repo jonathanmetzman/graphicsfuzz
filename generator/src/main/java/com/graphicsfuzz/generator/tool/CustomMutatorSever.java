@@ -70,6 +70,7 @@ public class CustomMutatorSever {
       // Support two sizes for now so that one message format can be used between CustomMutate and
       // CustomCrossOver.
       long size2 = headerByteBuffer.getLong();
+      assert size2 == 0;
 
       // Java won't allow us to create an array with a "long" size. Therefore, we must convert it to
       // int before creating the array. This is probably a non-issue because libFuzzer is unlikely
