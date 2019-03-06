@@ -36,9 +36,13 @@ import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
 import java.util.Optional;
 
+/**
+ * Server that can accept shaders from a libFuzzer custom mutator and send back a mutated shader.
+ */
 public class CustomMutatorSever {
   public static void main(String[] args) {
     try {
+      // TODO(metzman): If we don't switch from TCP, allow this to be configurable.
       runServer(8666);
     } catch (IOException | ParseTimeoutException | InterruptedException exception) {
       exception.printStackTrace();
@@ -48,8 +52,6 @@ public class CustomMutatorSever {
 
   private static void runServer(int port)
       throws IOException, ParseTimeoutException, InterruptedException {
-    ByteArrayOutputStream byteArrayOutputStream;
-    TranslationUnit tu;
     byte[] headerBuff = new byte[28];
     ServerSocket serverSocket = new ServerSocket(port);
     Socket socket = serverSocket.accept();
@@ -57,22 +59,34 @@ public class CustomMutatorSever {
     OutputStream outputStream = socket.getOutputStream();
     while (true) {
       // TODO(metzman) Figure out a better way to handle waiting for the header to arrive.
-      while (inputStream.available() < headerBuff.length) ;
+      while (inputStream.available() < headerBuff.length) {
+        ;
+      }
       inputStream.read(headerBuff, 0, headerBuff.length);
-      ByteBuffer bb = ByteBuffer.wrap(headerBuff);
-      bb.order(ByteOrder.LITTLE_ENDIAN);
-      long size1 = bb.getLong();
-      long size2 = bb.getLong();
+      ByteBuffer headerByteBuffer = ByteBuffer.wrap(headerBuff);
+      headerByteBuffer.order(ByteOrder.LITTLE_ENDIAN);
+
+      long size1 = headerByteBuffer.getLong();
+      // Support two sizes for now so that one message format can be used between CustomMutate and
+      // CustomCrossOver.
+      long size2 = headerByteBuffer.getLong();
+
+      // Java won't allow us to create an array with a "long" size. Therefore, we must convert it to
+      // int before creating the array. This is probably a non-issue because libFuzzer is unlikely
+      // to ever give us a shader larger than Integer.MAX_VALUE (e.g. ~2G).
+      assert size1 <= Integer.MAX_VALUE && size2 <= Integer.MAX_VALUE;
+
       // GraphicsFuzz can't do anything with this unfortunately.
-      long maxOutSize = bb.getLong();
-      int libfuzzerSeed = bb.getInt();
+      long maxOutSize = headerByteBuffer.getLong();
+
+      int libfuzzerSeed = headerByteBuffer.getInt();
       byte[] inputDataBuff = new byte[((int) size1) + ((int) size2)];
       socket.getInputStream().read(inputDataBuff, 0, inputDataBuff.length);
       try {
-        String s = new String(inputDataBuff);
-        tu = ParseHelper.parse(s, ShaderKind.FRAGMENT);
+        String shaderString = new String(inputDataBuff);
+        TranslationUnit tu = ParseHelper.parse(shaderString, ShaderKind.FRAGMENT);
         Mutate.mutate(tu, new RandomWrapper(libfuzzerSeed));
-        byteArrayOutputStream = new ByteArrayOutputStream();
+        ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
         try (PrintStream stream = new PrintStream(byteArrayOutputStream, true, "UTF-8")) {
           PrettyPrinterVisitor.emitShader(
               tu,
