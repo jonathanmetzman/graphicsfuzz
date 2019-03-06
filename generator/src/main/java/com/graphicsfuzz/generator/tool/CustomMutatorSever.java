@@ -81,11 +81,15 @@ public class CustomMutatorSever {
       long maxOutSize = headerByteBuffer.getLong();
 
       int libfuzzerSeed = headerByteBuffer.getInt();
-      byte[] inputDataBuff = new byte[((int) size1) + ((int) size2)];
-      socket.getInputStream().read(inputDataBuff, 0, inputDataBuff.length);
+
+      // Read the Shader.
+      byte[] inputShaderBuff = new byte[((int) size1) + ((int) size2)];
+      socket.getInputStream().read(inputShaderBuff, 0, inputShaderBuff.length);
+      String inputShader = new String(inputShaderBuff);
+
       try {
-        String shaderString = new String(inputDataBuff);
-        TranslationUnit tu = ParseHelper.parse(shaderString, ShaderKind.FRAGMENT);
+        // Now mutate the shader.
+        TranslationUnit tu = ParseHelper.parse(inputShader, ShaderKind.FRAGMENT);
         Mutate.mutate(tu, new RandomWrapper(libfuzzerSeed));
         ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
         try (PrintStream stream = new PrintStream(byteArrayOutputStream, true, "UTF-8")) {
@@ -96,20 +100,24 @@ public class CustomMutatorSever {
               PrettyPrinterVisitor.DEFAULT_INDENTATION_WIDTH,
               PrettyPrinterVisitor.DEFAULT_NEWLINE_SUPPLIER,
               false);
-          String data = new String(byteArrayOutputStream.toByteArray(), StandardCharsets.UTF_8);
-          ByteBuffer lengthByteBuffer = ByteBuffer.allocate(8);
+          String outputShader = new String(byteArrayOutputStream.toByteArray(), StandardCharsets.UTF_8);
+
+          // Get shader size as a little endian uint64_t.
+          ByteBuffer lengthByteBuffer = ByteBuffer.allocate(Long.BYTES);
           lengthByteBuffer.order(ByteOrder.LITTLE_ENDIAN);
-          lengthByteBuffer.putLong((long) data.length());
-          byte[] length = new byte[8];
+          lengthByteBuffer.putLong((long) outputShader.length());
+          byte[] length = new byte[Long.BYTES];
           lengthByteBuffer.position(0);
           lengthByteBuffer.get(length);
           outputStream.write(length);
-          outputStream.write(data.getBytes());
+
+          outputStream.write(outputShader.getBytes());
         }
       } catch (GlslParserException | FuzzedIntoACornerException exception) {
         exception.printStackTrace();
-        System.out.println(new String(inputDataBuff));
-        for (int idx = 0; idx < 8; idx++) {
+        System.out.println(new String(inputShaderBuff));
+        // Tell libFuzzer we will "send" it a 0-length shader.
+        for (int idx = 0; idx < Long.BYTES; idx++) {
           outputStream.write(0);
         }
       }
